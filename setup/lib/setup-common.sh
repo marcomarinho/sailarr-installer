@@ -237,3 +237,159 @@ export -f retry_command
 export -f validate_required
 export -f validate_directory
 export -f create_directory
+
+# Ask user for input with standard format
+# Usage: ask_user_input "title" "description" "prompt" "default_value" "required" "output_var"
+ask_user_input() {
+    local title="$1"
+    local description="$2"
+    local prompt="$3"
+    local default_value="$4"
+    local required="$5"
+    local output_var="$6"
+
+    if [ -n "$title" ]; then
+        echo "$title"
+        echo "$(printf '%*s' ${#title} '' | tr ' ' '-')"
+    fi
+
+    if [ -n "$description" ]; then
+        echo "$description"
+    fi
+
+    if [ -n "$default_value" ]; then
+        echo "Current default: $default_value"
+    fi
+
+    read -p "$prompt" user_input
+
+    # Apply default if empty
+    user_input="${user_input:-$default_value}"
+
+    # Validate if required
+    if [ "$required" = "true" ]; then
+        while [ -z "$user_input" ]; do
+            echo "ERROR: This field is required!"
+            read -p "$prompt" user_input
+            user_input="${user_input:-$default_value}"
+        done
+    fi
+
+    echo ""
+
+    # Store in output variable
+    eval "$output_var='$user_input'"
+}
+
+# Ask user for password (hidden input)
+# Usage: ask_password "prompt" "required" "output_var"
+ask_password() {
+    local prompt="$1"
+    local required="$2"
+    local output_var="$3"
+
+    read -sp "$prompt" user_password
+    echo ""
+
+    # Validate if required
+    if [ "$required" = "true" ]; then
+        while [ -z "$user_password" ]; do
+            echo "ERROR: This field is required!"
+            read -sp "$prompt" user_password
+            echo ""
+        done
+    fi
+
+    # Store in output variable
+    eval "$output_var='$user_password'"
+}
+
+# Create folder with permissions (atomic, reusable)
+# Usage: create_folder "/path/to/folder" "owner:group" "permissions"
+create_folder() {
+    local folder_path="$1"
+    # owner arg ignored
+    local permissions="${3:-755}"
+
+    mkdir -p "$folder_path"
+    chmod "$permissions" "$folder_path"
+}
+
+# Set permissions on path (atomic, reusable)
+# Usage: set_permissions "/path" "permissions" "owner:group"
+set_permissions() {
+    local path="$1"
+    local permissions="$2"
+    # owner arg ignored as we use current user
+
+    if [ -n "$permissions" ]; then
+        chmod -R "$permissions" "$path"
+    fi
+}
+
+# Copy file with permissions (atomic, reusable)
+# Usage: copy_file "source" "destination" "owner:group" "permissions"
+copy_file() {
+    local source="$1"
+    local destination="$2"
+    # owner arg ignored
+    local permissions="${4:-}"
+
+    cp "$source" "$destination"
+
+    if [ -n "$permissions" ]; then
+        chmod "$permissions" "$destination"
+    fi
+}
+
+# Download file from URL with permissions (atomic, reusable)
+# Usage: download_file "url" "destination" "owner:group" "permissions"
+download_file() {
+    local url="$1"
+    local destination="$2"
+    # owner arg ignored
+    local permissions="${4:-}"
+
+    local temp_file="/tmp/download-$$-$(basename "$destination")"
+
+    curl -sL "$url" -o "$temp_file"
+    cp "$temp_file" "$destination"
+    rm -f "$temp_file"
+
+    if [ -n "$permissions" ]; then
+        chmod "$permissions" "$destination"
+    fi
+}
+
+# Create file from content with permissions (atomic, reusable)
+# Usage: create_file_from_content "destination" "content" "owner:group" "permissions"
+create_file_from_content() {
+    local destination="$1"
+    local content="$2"
+    # owner arg ignored
+    local permissions="${4:-}"
+
+    echo "$content" | tee "$destination" > /dev/null
+
+    if [ -n "$permissions" ]; then
+        chmod "$permissions" "$destination"
+    fi
+}
+
+# Append content to file (atomic, reusable)
+# Usage: append_to_file "file_path" "content"
+append_to_file() {
+    local file_path="$1"
+    local content="$2"
+
+    echo "$content" >> "$file_path"
+}
+
+export -f ask_user_input
+export -f ask_password
+export -f create_folder
+export -f set_permissions
+export -f copy_file
+export -f download_file
+export -f create_file_from_content
+export -f append_to_file

@@ -8,92 +8,27 @@
 # ATOMIC FUNCTIONS
 # ========================================
 
+# Get the directory where this script is located
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+# Source libraries
+source "$SCRIPT_DIR/setup/lib/setup-common.sh"
+source "$SCRIPT_DIR/setup/lib/setup-users.sh"
+source "$SCRIPT_DIR/setup/lib/setup-docker.sh"
+source "$SCRIPT_DIR/setup/lib/setup-api.sh"
+source "$SCRIPT_DIR/setup/lib/setup-services.sh"
+
 # Check if running as root
-check_root() {
-    if [ "$EUID" -eq 0 ]; then
-        echo "ERROR: Do not run this script with sudo or as root!"
-        echo "The script will request sudo permissions when needed."
-        echo ""
-        echo "Please run: ./setup.sh"
-        exit 1
-    fi
-}
+# Moved to setup/lib/setup-users.sh
 
 # Ask user for input with standard format
-# Usage: ask_user_input "title" "description" "prompt" "default_value" "required" "output_var"
-ask_user_input() {
-    local title="$1"
-    local description="$2"
-    local prompt="$3"
-    local default_value="$4"
-    local required="$5"
-    local output_var="$6"
-
-    if [ -n "$title" ]; then
-        echo "$title"
-        echo "$(printf '%*s' ${#title} '' | tr ' ' '-')"
-    fi
-
-    if [ -n "$description" ]; then
-        echo "$description"
-    fi
-
-    if [ -n "$default_value" ]; then
-        echo "Current default: $default_value"
-    fi
-
-    read -p "$prompt" user_input
-
-    # Apply default if empty
-    user_input="${user_input:-$default_value}"
-
-    # Validate if required
-    if [ "$required" = "true" ]; then
-        while [ -z "$user_input" ]; do
-            echo "ERROR: This field is required!"
-            read -p "$prompt" user_input
-            user_input="${user_input:-$default_value}"
-        done
-    fi
-
-    echo ""
-
-    # Store in output variable
-    eval "$output_var='$user_input'"
-}
+# Moved to setup/lib/setup-common.sh
 
 # Ask user for password (hidden input)
-# Usage: ask_password "prompt" "required" "output_var"
-ask_password() {
-    local prompt="$1"
-    local required="$2"
-    local output_var="$3"
-
-    read -sp "$prompt" user_password
-    echo ""
-
-    # Validate if required
-    if [ "$required" = "true" ]; then
-        while [ -z "$user_password" ]; do
-            echo "ERROR: This field is required!"
-            read -sp "$prompt" user_password
-            echo ""
-        done
-    fi
-
-    # Store in output variable
-    eval "$output_var='$user_password'"
-}
+# Moved to setup/lib/setup-common.sh
 
 # Get Docker group GID
-get_docker_gid() {
-    if getent group docker >/dev/null 2>&1; then
-        getent group docker | cut -d: -f3
-    else
-        # Fallback if docker group doesn't exist (unlikely if docker is installed)
-        echo "0"
-    fi
-}
+# Moved to setup/lib/setup-users.sh
 
 # Create .env.install configuration file
 create_env_install() {
@@ -167,129 +102,28 @@ EOF
 }
 
 # Create folder with permissions (atomic, reusable)
-# Usage: create_folder "/path/to/folder" "owner:group" "permissions"
-# Create folder with permissions (atomic, reusable)
-# Usage: create_folder "/path/to/folder" "owner:group" "permissions"
-create_folder() {
-    local folder_path="$1"
-    # owner arg ignored
-    local permissions="${3:-755}"
-
-    mkdir -p "$folder_path"
-    chmod "$permissions" "$folder_path"
-}
+# Moved to setup/lib/setup-common.sh
 
 # Set permissions on path (atomic, reusable)
-# Usage: set_permissions "/path" "permissions" "owner:group"
-# Set permissions on path (atomic, reusable)
-# Usage: set_permissions "/path" "permissions" "owner:group"
-set_permissions() {
-    local path="$1"
-    local permissions="$2"
-    # owner arg ignored as we use current user
-
-    if [ -n "$permissions" ]; then
-        chmod -R "$permissions" "$path"
-    fi
-}
+# Moved to setup/lib/setup-common.sh
 
 # Copy file with permissions (atomic, reusable)
-# Usage: copy_file "source" "destination" "owner:group" "permissions"
-# Copy file with permissions (atomic, reusable)
-# Usage: copy_file "source" "destination" "owner:group" "permissions"
-copy_file() {
-    local source="$1"
-    local destination="$2"
-    # owner arg ignored
-    local permissions="${4:-}"
-
-    cp "$source" "$destination"
-
-    if [ -n "$permissions" ]; then
-        chmod "$permissions" "$destination"
-    fi
-}
+# Moved to setup/lib/setup-common.sh
 
 # Download file from URL with permissions (atomic, reusable)
-# Usage: download_file "url" "destination" "owner:group" "permissions"
-# Download file from URL with permissions (atomic, reusable)
-# Usage: download_file "url" "destination" "owner:group" "permissions"
-download_file() {
-    local url="$1"
-    local destination="$2"
-    # owner arg ignored
-    local permissions="${4:-}"
-
-    local temp_file="/tmp/download-$$-$(basename "$destination")"
-
-    curl -sL "$url" -o "$temp_file"
-    cp "$temp_file" "$destination"
-    rm -f "$temp_file"
-
-    if [ -n "$permissions" ]; then
-        chmod "$permissions" "$destination"
-    fi
-}
+# Moved to setup/lib/setup-common.sh
 
 # Create file from content with permissions (atomic, reusable)
-# Usage: create_file_from_content "destination" "content" "owner:group" "permissions"
-# Create file from content with permissions (atomic, reusable)
-# Usage: create_file_from_content "destination" "content" "owner:group" "permissions"
-create_file_from_content() {
-    local destination="$1"
-    local content="$2"
-    # owner arg ignored
-    local permissions="${4:-}"
-
-    echo "$content" | tee "$destination" > /dev/null
-
-    if [ -n "$permissions" ]; then
-        chmod "$permissions" "$destination"
-    fi
-}
+# Moved to setup/lib/setup-common.sh
 
 # Run docker compose up with validation (atomic, reusable)
-# Usage: run_docker_compose_up "/path/to/docker/dir"
-# Returns: 0 if success, 1 if failed
-run_docker_compose_up() {
-    local compose_dir="$1"
-
-    cd "$compose_dir" || return 1
-    ./up.sh
-    local exit_code=$?
-
-    if [ $exit_code -ne 0 ]; then
-        log_error "Docker Compose failed to start services (exit code: $exit_code)" >&2
-        return 1
-    fi
-
-    return 0
-}
+# Moved to setup/lib/setup-docker.sh
 
 # Validate that ONE docker service is running (atomic, call N times)
-# Usage: validate_docker_service "service_name"
-# Returns: 0 if running, 1 if not running
-validate_docker_service() {
-    local service_name="$1"
-
-    if docker ps --format "{{.Names}}" | grep -q "^${service_name}$"; then
-        return 0
-    else
-        return 1
-    fi
-}
+# Moved to setup/lib/setup-docker.sh
 
 # Get docker container health status (atomic, call N times)
-# Usage: get_docker_health_status "container_name" "output_var"
-get_docker_health_status() {
-    local container_name="$1"
-    local output_var="$2"
-    local status
-
-    status=$(docker inspect -f '{{.State.Health.Status}}' "$container_name" 2>/dev/null || echo "none")
-
-    eval "$output_var='$status'"
-}
+# Moved to setup/lib/setup-docker.sh
 
 # Wait for HTTP service to be ready (atomic, call N times)
 # Usage: wait_for_http_service "service_name" "url" "max_attempts" "sleep_seconds"
@@ -316,29 +150,7 @@ wait_for_http_service() {
 }
 
 # Wait for docker container to be healthy (atomic, call N times)
-# Usage: wait_for_docker_health "container_name" "max_attempts" "sleep_seconds"
-# Returns: 0 if healthy, 1 if timeout
-wait_for_docker_health() {
-    local container_name="$1"
-    local max_attempts="${2:-60}"
-    local sleep_seconds="${3:-2}"
-    local attempt=1
-    local status
-
-    echo -n "Waiting for $container_name to be ready"
-    while [ $attempt -le $max_attempts ]; do
-        status=$(docker inspect -f '{{.State.Health.Status}}' "$container_name" 2>/dev/null || echo "none")
-        if [ "$status" = "healthy" ]; then
-            echo " ✓"
-            return 0
-        fi
-        echo -n "."
-        sleep $sleep_seconds
-        attempt=$((attempt + 1))
-    done
-    echo " ✗ (timeout)"
-    return 1
-}
+# Moved to setup/lib/setup-docker.sh
 
 # Generic GET request with API key (atomic, reusable)
 # Usage: api_get_request "url" "api_key" "output_var"
@@ -548,13 +360,7 @@ run_recyclarr_sync() {
 }
 
 # Append content to file (atomic, reusable)
-# Usage: append_to_file "file_path" "content"
-append_to_file() {
-    local file_path="$1"
-    local content="$2"
-
-    echo "$content" >> "$file_path"
-}
+# Moved to setup/lib/setup-common.sh
 
 # Show installation summary
 show_installation_summary() {
@@ -835,7 +641,8 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 # Load setup libraries
 LIB_DIR="${SCRIPT_DIR}/setup/lib"
 source "${LIB_DIR}/setup-common.sh"
-# source "${LIB_DIR}/setup-users.sh" # Removed as part of simplification
+source "${LIB_DIR}/setup-users.sh"
+source "${LIB_DIR}/setup-docker.sh"
 source "${LIB_DIR}/setup-api.sh"
 source "${LIB_DIR}/setup-services.sh"
 
@@ -849,6 +656,33 @@ echo ""
 
 # Check if .env.install exists - if yes, skip configuration and go straight to install
 check_existing_config
+
+# Ensure MEDIACENTER_GID is not empty (even if loaded from config)
+if [ -z "$MEDIACENTER_GID" ]; then
+    MEDIACENTER_GID=$(get_docker_gid)
+    if [ -z "$MEDIACENTER_GID" ] || [ "$MEDIACENTER_GID" = "0" ]; then
+         # Try again or default to 0
+         MEDIACENTER_GID="0"
+    fi
+    
+    # If still empty or 0, log warning
+    if [ "$MEDIACENTER_GID" = "0" ]; then
+         log_warn "Could not detect Docker GID, defaulting to 0 (root)"
+    fi
+fi
+
+# Update .env.install with the correct GID if it was empty
+if [ -f "$SCRIPT_DIR/docker/.env.install" ]; then
+    # Use sed to replace empty or existing GID
+    if grep -q "^MEDIACENTER_GID=$" "$SCRIPT_DIR/docker/.env.install"; then
+        sed -i "s/^MEDIACENTER_GID=$/MEDIACENTER_GID=$MEDIACENTER_GID/" "$SCRIPT_DIR/docker/.env.install"
+    elif grep -q "^MEDIACENTER_GID=" "$SCRIPT_DIR/docker/.env.install"; then
+        # If it exists but might be wrong (e.g. empty string in file), update it
+        # Actually, if we loaded it and it was empty, we just fixed the variable.
+        # We should update the file to match.
+        sed -i "s/^MEDIACENTER_GID=.*/MEDIACENTER_GID=$MEDIACENTER_GID/" "$SCRIPT_DIR/docker/.env.install"
+    fi
+fi
 
 # ========================================
 # PHASE 1: CONFIGURATION
@@ -894,6 +728,7 @@ This is required for Zurg and Decypharr to work." \
         "true" \
         "REALDEBRID_TOKEN"
 
+    # Ask for Plex claim token (optional)
     # Ask for Plex claim token (optional)
     ask_user_input \
         "Plex Claim Token (Optional)" \
@@ -1052,6 +887,7 @@ create_folder "${ROOT_DIR}/data/symlinks/sonarr" "$INSTALL_UID:mediacenter" "775
 create_folder "${ROOT_DIR}/data/realdebrid-zurg" "$INSTALL_UID:mediacenter" "775"
 create_folder "${ROOT_DIR}/data/media/movies" "$INSTALL_UID:mediacenter" "775"
 create_folder "${ROOT_DIR}/data/media/tv" "$INSTALL_UID:mediacenter" "775"
+create_folder "${ROOT_DIR}/data/transcode" "$INSTALL_UID:mediacenter" "775"
 
 echo "✓ Directory structure created"
 
@@ -1230,7 +1066,7 @@ DECYPHARR_CONFIG='{
     "vfs_read_ahead": "128k",
     "async_read": false,
     "transfers": 4,
-    "uid": '${DECYPHARR_UID}',
+    "uid": '${INSTALL_UID}',
     "gid": '${MEDIACENTER_GID}',
     "attr_timeout": "1s",
     "dir_cache_time": "5m",
@@ -1353,6 +1189,7 @@ if [[ $autoconfig_choice =~ ^[Yy]$ ]]; then
 
     # Start all services using atomic function
     log_operation "DOCKER_COMPOSE" "Starting all services"
+    log_info "Debug: MEDIACENTER_GID is set to '${MEDIACENTER_GID}'"
     if ! run_docker_compose_up "$DOCKER_DIR"; then
         log_error "Check the output above for errors"
         exit 1

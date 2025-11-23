@@ -1,7 +1,41 @@
 # Plex Media Server
 
 services:
+  plex-db-optimizer:
+    image: ${PLEX_IMAGE}:${PLEX_TAG}
+    container_name: plex-db-optimizer
+    network_mode: none
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        DB_PATH="/config/Library/Application Support/Plex Media Server/Plug-in Support/Databases/com.plexapp.plugins.library.db"
+        if [ -f "$$DB_PATH" ]; then
+          echo "Found Plex DB. Starting optimization..."
+          cp "$$DB_PATH" "$$DB_PATH.backup"
+          echo "Backup created."
+          "/usr/lib/plexmediaserver/Plex Media Server" --sqlite "$$DB_PATH" "pragma page_size=32768; vacuum; pragma default_cache_size = 20000000;"
+          echo "Optimization complete."
+          chown ${INSTALL_UID}:${MEDIACENTER_GID} "$$DB_PATH" "$$DB_PATH.backup"
+        else
+          echo "No DB found. Skipping optimization."
+        fi
+    environment:
+      - PUID=${INSTALL_UID}
+      - PGID=${MEDIACENTER_GID}
+    volumes:
+      - ${ROOT_DIR}/config/plex-config:/config
+
   plex:
+    depends_on:
+      plex-db-optimizer:
+        condition: service_completed_successfully
+      seerr:
+        condition: service_healthy
+        restart: true
+      rclone:
+        condition: service_healthy
+        restart: true
     image: ${PLEX_IMAGE}:${PLEX_TAG}
     env_file:
       - ../.env.defaults
@@ -15,19 +49,15 @@ services:
       - TZ=${TIMEZONE}
       - VERSION=docker
       - PLEX_CLAIM=${PLEX_CLAIM}
+    devices:
+      - /dev/dri:/dev/dri
     volumes:
       - ${ROOT_DIR}/config/plex-config:/config
       - ${ROOT_DIR}/data:/data
+      - ${ROOT_DIR}/data/transcode:/transcode
     healthcheck:
       test: ["CMD-SHELL", "curl --fail --silent http://localhost:32400/identity && test -d /data/realdebrid-zurg && mountpoint -q /data/realdebrid-zurg"]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 90s
-    depends_on:
-      seerr:
-        condition: service_healthy
-        restart: true
-      rclone:
-        condition: service_healthy
-        restart: true

@@ -218,6 +218,17 @@ create_directory() {
     fi
 }
 
+# Check if running as root
+check_root() {
+    if [ "$EUID" -eq 0 ]; then
+        echo "ERROR: Do not run this script with sudo or as root!"
+        echo "The script will request sudo permissions when needed."
+        echo ""
+        echo "Please run: ./setup.sh"
+        exit 1
+    fi
+}
+
 # Export functions
 export -f init_logging
 export -f log_to_file
@@ -237,6 +248,7 @@ export -f retry_command
 export -f validate_required
 export -f validate_directory
 export -f create_directory
+export -f check_root
 
 # Ask user for input with standard format
 # Usage: ask_user_input "title" "description" "prompt" "default_value" "required" "output_var"
@@ -385,6 +397,17 @@ append_to_file() {
     echo "$content" >> "$file_path"
 }
 
+# Get docker group ID (atomic, reusable)
+# Usage: get_docker_gid
+get_docker_gid() {
+    if getent group docker >/dev/null 2>&1; then
+        getent group docker | cut -d: -f3
+    else
+        # Fallback if docker group doesn't exist (unlikely if docker is installed)
+        echo "0"
+    fi
+}
+
 export -f ask_user_input
 export -f ask_password
 export -f create_folder
@@ -393,3 +416,4 @@ export -f copy_file
 export -f download_file
 export -f create_file_from_content
 export -f append_to_file
+export -f get_docker_gid

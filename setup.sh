@@ -13,22 +13,18 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # Source libraries
 source "$SCRIPT_DIR/setup/lib/setup-common.sh"
-source "$SCRIPT_DIR/setup/lib/setup-users.sh"
 source "$SCRIPT_DIR/setup/lib/setup-docker.sh"
 source "$SCRIPT_DIR/setup/lib/setup-api.sh"
 source "$SCRIPT_DIR/setup/lib/setup-services.sh"
 
 # Check if running as root
-# Moved to setup/lib/setup-users.sh
+# Moved to setup/lib/setup-common.sh
 
 # Ask user for input with standard format
 # Moved to setup/lib/setup-common.sh
 
 # Ask user for password (hidden input)
 # Moved to setup/lib/setup-common.sh
-
-# Get Docker group GID
-# Moved to setup/lib/setup-users.sh
 
 # Create .env.install configuration file
 create_env_install() {
@@ -387,7 +383,7 @@ show_installation_summary() {
     echo ""
     echo "GROUP TO BE USED"
     echo "-------------------"
-    echo "  - docker (GID: ${MEDIACENTER_GID})"
+    echo "  - mediacenter (GID: ${MEDIACENTER_GID})"
     echo ""
     echo "DIRECTORIES TO BE CREATED"
     echo "-------------------------"
@@ -402,7 +398,6 @@ show_installation_summary() {
     echo "  - Configure Zurg with Real-Debrid token"
     echo "  - Configure Decypharr with Real-Debrid token"
     echo "  - Set permissions (775/664)"
-    echo "  - Add current user ($USER) to mediacenter group"
     echo ""
     echo "========================================="
 }
@@ -641,7 +636,6 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 # Load setup libraries
 LIB_DIR="${SCRIPT_DIR}/setup/lib"
 source "${LIB_DIR}/setup-common.sh"
-source "${LIB_DIR}/setup-users.sh"
 source "${LIB_DIR}/setup-docker.sh"
 source "${LIB_DIR}/setup-api.sh"
 source "${LIB_DIR}/setup-services.sh"
@@ -656,33 +650,6 @@ echo ""
 
 # Check if .env.install exists - if yes, skip configuration and go straight to install
 check_existing_config
-
-# Ensure MEDIACENTER_GID is not empty (even if loaded from config)
-if [ -z "$MEDIACENTER_GID" ]; then
-    MEDIACENTER_GID=$(get_docker_gid)
-    if [ -z "$MEDIACENTER_GID" ] || [ "$MEDIACENTER_GID" = "0" ]; then
-         # Try again or default to 0
-         MEDIACENTER_GID="0"
-    fi
-    
-    # If still empty or 0, log warning
-    if [ "$MEDIACENTER_GID" = "0" ]; then
-         log_warn "Could not detect Docker GID, defaulting to 0 (root)"
-    fi
-fi
-
-# Update .env.install with the correct GID if it was empty
-if [ -f "$SCRIPT_DIR/docker/.env.install" ]; then
-    # Use sed to replace empty or existing GID
-    if grep -q "^MEDIACENTER_GID=$" "$SCRIPT_DIR/docker/.env.install"; then
-        sed -i "s/^MEDIACENTER_GID=$/MEDIACENTER_GID=$MEDIACENTER_GID/" "$SCRIPT_DIR/docker/.env.install"
-    elif grep -q "^MEDIACENTER_GID=" "$SCRIPT_DIR/docker/.env.install"; then
-        # If it exists but might be wrong (e.g. empty string in file), update it
-        # Actually, if we loaded it and it was empty, we just fixed the variable.
-        # We should update the file to match.
-        sed -i "s/^MEDIACENTER_GID=.*/MEDIACENTER_GID=$MEDIACENTER_GID/" "$SCRIPT_DIR/docker/.env.install"
-    fi
-fi
 
 # ========================================
 # PHASE 1: CONFIGURATION
